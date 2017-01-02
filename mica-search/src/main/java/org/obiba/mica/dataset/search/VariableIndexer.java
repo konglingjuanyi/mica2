@@ -12,13 +12,18 @@ package org.obiba.mica.dataset.search;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import javax.inject.Inject;
 
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
+import org.obiba.core.util.StreamUtil;
+import org.obiba.mica.dataset.PublishedDatasetVariableRepository;
 import org.obiba.mica.dataset.domain.Dataset;
 import org.obiba.mica.dataset.domain.DatasetVariable;
+import org.obiba.mica.dataset.domain.PublishedDatasetVariable;
 import org.obiba.mica.dataset.event.DatasetDeletedEvent;
 import org.obiba.mica.dataset.event.DatasetPublishedEvent;
 import org.obiba.mica.dataset.event.DatasetUnpublishedEvent;
@@ -53,6 +58,9 @@ public class VariableIndexer {
   @Inject
   private ElasticSearchIndexer elasticSearchIndexer;
 
+  @Inject
+  private PublishedDatasetVariableRepository publishedDatasetVariableRepository;
+
   @Async
   @Subscribe
   public void datasetUpdated(DatasetUpdatedEvent event) {
@@ -77,8 +85,9 @@ public class VariableIndexer {
       indexDatasetVariables(PUBLISHED_VARIABLE_INDEX, event.getVariables());
     }
 
-    if(event.hasHarmonizationVariables())
+    if(event.hasHarmonizationVariables()) {
       indexHarmonizedVariables(PUBLISHED_VARIABLE_INDEX, event.getHarmonizationVariables());
+    }
   }
 
   @Async
@@ -102,11 +111,21 @@ public class VariableIndexer {
 
   private void indexDatasetVariables(String indexName, Iterable<DatasetVariable> variables) {
     elasticSearchIndexer.indexAllIndexables(indexName, variables);
+    if (PUBLISHED_VARIABLE_INDEX.equals(indexName)) {
+      publishedDatasetVariableRepository.save(StreamSupport.stream(variables.spliterator(), false)
+          .map(PublishedDatasetVariable::new).collect(Collectors.toSet()));
+    }
   }
 
-  protected void indexHarmonizedVariables(String indexName, Map<String, List<DatasetVariable>> harmonizedVariables) {
+  private void indexHarmonizedVariables(String indexName, Map<String, List<DatasetVariable>> harmonizedVariables) {
     harmonizedVariables.keySet().forEach(
       parentId -> elasticSearchIndexer.indexAllIndexables(indexName, harmonizedVariables.get(parentId), parentId));
+    if (PUBLISHED_VARIABLE_INDEX.equals(indexName)) {
+      harmonizedVariables.keySet().forEach(
+          parentId ->
+              publishedDatasetVariableRepository.save(harmonizedVariables.get(parentId).stream()
+                  .map(PublishedDatasetVariable::new).collect(Collectors.toList())));
+    }
   }
 
   private void deleteDatasetVariables(String indexName, Dataset dataset) {
@@ -114,5 +133,8 @@ public class VariableIndexer {
     QueryBuilder query = QueryBuilders.termQuery("datasetId", dataset.getId());
     elasticSearchIndexer.delete(indexName, HARMONIZED_VARIABLE_TYPE, query);
     elasticSearchIndexer.delete(indexName, VARIABLE_TYPE, query);
+    if (PUBLISHED_VARIABLE_INDEX.equals(indexName)) {
+      publishedDatasetVariableRepository.deleteByVariableDatasetId(dataset.getId());
+    }
   }
 }

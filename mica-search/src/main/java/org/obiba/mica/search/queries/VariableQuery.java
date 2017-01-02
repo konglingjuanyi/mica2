@@ -21,6 +21,7 @@ import java.util.Properties;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -33,8 +34,10 @@ import org.elasticsearch.index.query.TermsQueryBuilder;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
 import org.obiba.mica.core.domain.AttributeKey;
+import org.obiba.mica.dataset.PublishedDatasetVariableRepository;
 import org.obiba.mica.dataset.domain.DatasetVariable;
 import org.obiba.mica.dataset.domain.HarmonizationDatasetState;
+import org.obiba.mica.dataset.domain.PublishedDatasetVariable;
 import org.obiba.mica.dataset.domain.StudyDatasetState;
 import org.obiba.mica.dataset.search.VariableIndexer;
 import org.obiba.mica.dataset.service.HarmonizationDatasetService;
@@ -119,6 +122,9 @@ public class VariableQuery extends AbstractDocumentQuery {
   @Inject
   private HarmonizationDatasetService harmonizationDatasetService;
 
+  @Inject
+  private PublishedDatasetVariableRepository publishedDatasetVariableRepository;
+
   private DatasetIdProvider datasetIdProvider;
 
   @Override
@@ -168,12 +174,12 @@ public class VariableQuery extends AbstractDocumentQuery {
     Map<String, Study> studyMap = Maps.newHashMap();
     Map<String, Network> networkMap = Maps.newHashMap();
 
-    for(SearchHit hit : hits) {
-      DatasetVariable.IdResolver resolver = DatasetVariable.IdResolver.from(hit.getId());
-      InputStream inputStream = new ByteArrayInputStream(hit.getSourceAsString().getBytes());
-      DatasetVariable variable = objectMapper.readValue(inputStream, DatasetVariable.class);
+    StreamSupport.stream(publishedDatasetVariableRepository.findAll(Lists.newArrayList(hits.getHits()).stream()
+        .map(SearchHit::getId).collect(Collectors.toList())).spliterator(), false)
+        .map(PublishedDatasetVariable::getVariable).forEach(variable -> {
+      DatasetVariable.IdResolver resolver = DatasetVariable.IdResolver.from(variable.getId());
       resBuilder.addSummaries(processHit(resolver, variable, studyMap, networkMap));
-    }
+        });
 
     builder.setExtension(MicaSearch.DatasetVariableResultDto.result, resBuilder.build());
   }

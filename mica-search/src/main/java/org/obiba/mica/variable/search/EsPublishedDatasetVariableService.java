@@ -10,17 +10,7 @@
 
 package org.obiba.mica.variable.search;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Collectors;
-
-import javax.annotation.Nullable;
-import javax.inject.Inject;
-
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.elasticsearch.action.search.SearchRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.index.IndexNotFoundException;
@@ -31,6 +21,7 @@ import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.aggregations.AbstractAggregationBuilder;
 import org.elasticsearch.search.aggregations.AggregationBuilders;
 import org.elasticsearch.search.aggregations.bucket.terms.Terms;
+import org.obiba.mica.dataset.PublishedDatasetVariableRepository;
 import org.obiba.mica.dataset.domain.DatasetVariable;
 import org.obiba.mica.dataset.domain.HarmonizationDatasetState;
 import org.obiba.mica.dataset.domain.StudyDatasetState;
@@ -42,7 +33,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import javax.annotation.Nullable;
+import javax.inject.Inject;
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class EsPublishedDatasetVariableService extends AbstractDocumentService<DatasetVariable>
@@ -65,6 +62,9 @@ public class EsPublishedDatasetVariableService extends AbstractDocumentService<D
   @Inject
   private HarmonizationDatasetService harmonizationDatasetService;
 
+  @Inject
+  private PublishedDatasetVariableRepository publishedDatasetVariableRepository;
+
   @Override
   public long getCountByStudyId(String studyId) {
     SearchResponse response = executeCountQuery(buildStudyFilteredQuery(studyId), null);
@@ -74,6 +74,11 @@ public class EsPublishedDatasetVariableService extends AbstractDocumentService<D
     }
 
     return response.getHits().totalHits();
+  }
+
+  @Override
+  protected DatasetVariable processHit(SearchHit hit) throws IOException {
+    return publishedDatasetVariableRepository.findOne(hit.getId()).getVariable();
   }
 
   public Map<String, Long> getCountByStudyIds(List<String> studyIds) {
@@ -87,12 +92,6 @@ public class EsPublishedDatasetVariableService extends AbstractDocumentService<D
     Terms aggregation = response.getAggregations().get(STUDY_IDS_FIELD);
     return studyIds.stream().collect(Collectors.toMap(s -> s,
       s -> Optional.ofNullable(aggregation.getBucketByKey(s)).map(Terms.Bucket::getDocCount).orElse(0L)));
-  }
-
-  @Override
-  protected DatasetVariable processHit(SearchHit hit) throws IOException {
-    InputStream inputStream = new ByteArrayInputStream(hit.getSourceAsString().getBytes());
-    return objectMapper.readValue(inputStream, DatasetVariable.class);
   }
 
   @Override
