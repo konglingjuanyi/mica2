@@ -34,18 +34,20 @@ import org.obiba.mica.security.Roles;
 import org.obiba.mica.security.domain.SubjectAcl;
 import org.obiba.mica.security.event.SubjectAclUpdatedEvent;
 import org.obiba.mica.security.service.SubjectAclService;
+import org.springframework.beans.BeansException;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.test.SpringApplicationContextLoader;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationContextAware;
 import org.springframework.stereotype.Component;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.eventbus.Subscribe;
 
 @Component
-public class MicaAuthorizingRealm extends AuthorizingRealm implements RolePermissionResolver {
+public class MicaAuthorizingRealm extends AuthorizingRealm implements RolePermissionResolver, ApplicationContextAware {
 
   private static final String[] ALL_RESOURCES = { "network", "study", "study-dataset", "harmonization-dataset", "project" };
-
-  @Inject
-  private SubjectAclService subjectAclService;
 
   private final RolePermissionResolver rolePermissionResolver = new GroupPermissionResolver();
 
@@ -136,10 +138,18 @@ public class MicaAuthorizingRealm extends AuthorizingRealm implements RolePermis
   }
 
   private List<String> loadSubjectPermissions(String name, SubjectAcl.Type type) {
+    SubjectAclService subjectAclService = applicationContext.getBean(SubjectAclService.class);
     // get permissions that apply to the subject and to all subjects
     return Stream
       .concat(subjectAclService.findBySubject("*", type).stream(), subjectAclService.findBySubject(name, type).stream())
       .map(SubjectAcl::getPermission).collect(Collectors.toList());
+  }
+
+  private ApplicationContext applicationContext;
+
+  @Override
+  public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
+  this.applicationContext = applicationContext;
   }
 
   //

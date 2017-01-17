@@ -11,6 +11,7 @@ package org.obiba.mica.security;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 
 import javax.annotation.PreDestroy;
@@ -40,6 +41,8 @@ import org.apache.shiro.session.mgt.ExecutorServiceSessionValidationScheduler;
 import org.apache.shiro.session.mgt.SessionValidationScheduler;
 import org.apache.shiro.session.mgt.eis.EnterpriseCacheSessionDAO;
 import org.apache.shiro.util.LifecycleUtils;
+import org.apache.shiro.web.config.WebIniSecurityManagerFactory;
+import org.apache.shiro.web.mgt.DefaultWebSecurityManager;
 import org.obiba.shiro.SessionStorageEvaluator;
 import org.obiba.shiro.realm.ObibaRealm;
 import org.slf4j.Logger;
@@ -56,8 +59,8 @@ import com.google.common.collect.ImmutableList;
 
 import static org.obiba.mica.security.AuthoritiesConstants.ADMIN;
 
-@Component
-@DependsOn("cacheConfiguration")
+//@Component
+//@DependsOn("cacheConfiguration")
 public class SecurityManagerFactory implements FactoryBean<SecurityManager> {
 
   public static final String INI_REALM = "mica-ini-realm";
@@ -129,16 +132,16 @@ public class SecurityManagerFactory implements FactoryBean<SecurityManager> {
     }
   }
 
-  private class CustomIniSecurityManagerFactory extends IniSecurityManagerFactory {
+  private class CustomIniSecurityManagerFactory extends WebIniSecurityManagerFactory {
 
     private CustomIniSecurityManagerFactory(String resourcePath) {
-      super(resourcePath);
+      super(Ini.fromResourcePath(resourcePath));
     }
 
     @Override
     @SuppressWarnings("ChainOfInstanceofChecks")
     protected SecurityManager createDefaultInstance() {
-      DefaultSecurityManager dsm = (DefaultSecurityManager) super.createDefaultInstance();
+      DefaultWebSecurityManager dsm = (DefaultWebSecurityManager) super.createDefaultInstance();
 
       initializeCacheManager(dsm);
       initializeSessionManager(dsm);

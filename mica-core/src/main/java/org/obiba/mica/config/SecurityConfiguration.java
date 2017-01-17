@@ -20,9 +20,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.context.annotation.ImportResource;
 
-@Configuration
-@ImportResource("classpath:context.xml")
-@AutoConfigureAfter(CacheConfiguration.class)
+//@Configuration
+//@ImportResource("classpath:context.xml")
+//@AutoConfigureAfter(CacheConfiguration.class)
 public class SecurityConfiguration {
 
   @Bean
